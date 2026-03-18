@@ -1,0 +1,87 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: tableorder
+      POSTGRES_PASSWORD: tableorder
+      POSTGRES_DB: tableorder
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tableorder"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://tableorder:tableorder@db:5432/tableorder
+      JWT_SECRET_KEY: dev-secret-key-change-in-production
+      JWT_ALGORITHM: HS256
+      JWT_EXPIRATION_HOURS: "16"
+      CORS_ORIGINS: http://localhost:3000,http://localhost:3001
+      UPLOAD_DIR: /app/uploads
+      LOG_LEVEL: INFO
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      OTEL_SERVICE_NAME: table-order-backend
+    volumes:
+      - ./backend/uploads:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+
+  customer-frontend:
+    build: ./customer-frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+  admin-frontend:
+    build: ./admin-frontend
+    ports:
+      - "3001:3001"
+    depends_on:
+      - backend
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.96.0
+    command: ["--config=/etc/otel/config.yaml"]
+    volumes:
+      - ./monitoring/otel-collector-config.yaml:/etc/otel/config.yaml
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+
+  mimir:
+    image: grafana/mimir:2.11.0
+    command: ["-config.file=/etc/mimir/mimir.yaml"]
+    volumes:
+      - ./monitoring/mimir.yaml:/etc/mimir/mimir.yaml
+      - mimir-data:/data/mimir
+    ports:
+      - "9009:9009"
+
+  grafana:
+    image: grafana/grafana:10.3.1
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards
+    ports:
+      - "3002:3000"
+    depends_on:
+      - mimir
+
+volumes:
+  postgres-data:
+  mimir-data:

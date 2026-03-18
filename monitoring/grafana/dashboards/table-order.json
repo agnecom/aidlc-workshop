@@ -1,0 +1,139 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "title": "HTTP 요청률 (req/s)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${DS_MIMIR}" },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "targets": [
+        {
+          "expr": "rate(http_server_request_duration_seconds_count{job=\"table-order-backend\"}[1m])",
+          "legendFormat": "{{http_request_method}} {{http_route}}"
+        }
+      ]
+    },
+    {
+      "title": "HTTP 응답시간 (p95)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${DS_MIMIR}" },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, rate(http_server_request_duration_seconds_bucket{job=\"table-order-backend\"}[5m]))",
+          "legendFormat": "p95"
+        },
+        {
+          "expr": "histogram_quantile(0.50, rate(http_server_request_duration_seconds_bucket{job=\"table-order-backend\"}[5m]))",
+          "legendFormat": "p50"
+        }
+      ]
+    },
+    {
+      "title": "HTTP 에러율 (5xx)",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "${DS_MIMIR}" },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "thresholds": { "steps": [{"color":"green","value":null},{"color":"red","value":0.01}] } }, "overrides": [] },
+      "targets": [
+        {
+          "expr": "sum(rate(http_server_request_duration_seconds_count{job=\"table-order-backend\",http_response_status_code=~\"5..\"}[5m])) / sum(rate(http_server_request_duration_seconds_count{job=\"table-order-backend\"}[5m]))",
+          "legendFormat": "error rate"
+        }
+      ]
+    },
+    {
+      "title": "활성 요청 수",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "${DS_MIMIR}" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        {
+          "expr": "http_server_active_requests{job=\"table-order-backend\"}",
+          "legendFormat": "active"
+        }
+      ]
+    },
+    {
+      "title": "주문 수 (누적)",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "${DS_MIMIR}" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        {
+          "expr": "orders_created_total{job=\"table-order-backend\"}",
+          "legendFormat": "orders"
+        }
+      ]
+    },
+    {
+      "title": "활성 SSE 연결",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "${DS_MIMIR}" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        {
+          "expr": "sse_active_connections{job=\"table-order-backend\"}",
+          "legendFormat": "connections"
+        }
+      ]
+    },
+    {
+      "title": "엔드포인트별 요청률",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "${DS_MIMIR}" },
+      "targets": [
+        {
+          "expr": "sum by (http_route, http_request_method) (rate(http_server_request_duration_seconds_count{job=\"table-order-backend\"}[5m]))",
+          "format": "table",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "title": "주문/분 추이",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "${DS_MIMIR}" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        {
+          "expr": "rate(orders_created_total{job=\"table-order-backend\"}[1m]) * 60",
+          "legendFormat": "orders/min"
+        },
+        {
+          "expr": "rate(recommendations_generated_total{job=\"table-order-backend\"}[1m]) * 60",
+          "legendFormat": "recommendations/min"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["table-order"],
+  "templating": {
+    "list": [
+      {
+        "current": { "selected": false, "text": "Mimir", "value": "Mimir" },
+        "hide": 0,
+        "name": "DS_MIMIR",
+        "type": "datasource",
+        "query": "prometheus"
+      }
+    ]
+  },
+  "time": { "from": "now-30m", "to": "now" },
+  "title": "테이블오더 서비스 모니터링",
+  "uid": "table-order-main",
+  "version": 1
+}
